@@ -117,9 +117,9 @@ def students():
     if conn:
         cursor = conn.cursor(dictionary=True)
         try:
-            # Get all students
+            # Get all students with complete room info
             cursor.execute("""
-                SELECT s.*, r.room_number 
+                SELECT s.*, r.room_number, r.capacity, r.current_occupancy 
                 FROM students s 
                 LEFT JOIN rooms r ON s.room_id = r.id
             """)
@@ -127,7 +127,7 @@ def students():
             
             # Get available rooms
             cursor.execute("""
-                SELECT id, room_number 
+                SELECT id, room_number, capacity, current_occupancy 
                 FROM rooms 
                 WHERE status='available' OR status='partially_occupied'
             """)

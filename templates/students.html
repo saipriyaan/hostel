@@ -45,33 +45,36 @@
             </tr>
         </thead>
         <tbody>
-            {% for student in students %}
-            <tr>
-                <td>{{ student.id }}</td>
-                <td>{{ student.name }}</td>
-                <td>{{ student.roll_number }}</td>
-                <td>{{ student.email or '-' }}</td>
-                <td>{{ student.phone or '-' }}</td>
-                <td>{{ student.room_number }}</td>
-                <td>{{ student.check_in_date }}</td>
-                <td>
-                    {% if student.check_out_date %}
-                        <span class="badge bg-secondary">Checked Out</span>
-                    {% else %}
-                        <span class="badge bg-success">Checked In</span>
-                    {% endif %}
-                </td>
-                <td>
-                    {% if not student.check_out_date %}
-                    <a href="/check_out/{{ student.id }}" class="btn btn-sm btn-warning">Check Out</a>
-                    {% endif %}
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="9" class="text-center">No students found</td>
-            </tr>
-            {% endfor %}
+       <!-- In your students.html, change any room.capacity references to room['capacity'] -->
+{% for student in students %}
+<tr>
+    <td>{{ student['id'] }}</td>
+    <td>{{ student['name'] }}</td>
+    <td>{{ student['roll_number'] }}</td>
+    <td>{{ student['email'] or '-' }}</td>
+    <td>{{ student['phone'] or '-' }}</td>
+    <td>
+        {% if student['room_id'] %}
+            {{ student['room_number'] }} ({{ student['current_occupancy'] }}/{{ student['capacity'] }})
+        {% else %}
+            Not assigned
+        {% endif %}
+    </td>
+    <td>{{ student['check_in_date'] }}</td>
+    <td>
+        {% if student['check_out_date'] %}
+            <span class="badge bg-secondary">Checked Out</span>
+        {% else %}
+            <span class="badge bg-success">Checked In</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if not student['check_out_date'] %}
+        <a href="/check_out/{{ student['id'] }}" class="btn btn-sm btn-warning">Check Out</a>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}
         </tbody>
     </table>
 </div>
@@ -107,8 +110,8 @@
                         <select name="room_id" class="form-select" required>
                             <option value="">Select Room</option>
                             {% for room in available_rooms %}
-                            <option value="{{ room.id }}">
-                                {{ room.room_number }} (Capacity: {{ room.capacity }}, Available: {{ room.capacity - room.current_occupancy }})
+                            <option value="{{ room['id'] }}">
+                                {{ room['room_number'] }} (Capacity: {{ room['capacity'] }}, Available: {{ room['capacity'] - room['current_occupancy'] }})
                             </option>
                             {% endfor %}
                         </select>
