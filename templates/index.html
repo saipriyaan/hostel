@@ -2,45 +2,61 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-12">
-        <h1 class="text-center mb-4">Hostel Management System</h1>
+    <div class="col-md-12 text-center mb-4">
+        <h1>Welcome to Hostel Management System</h1>
+        <p class="lead">Manage students, rooms, and staff efficiently</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
         <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Welcome to Hostel Management System</h5>
-                <p class="card-text">
-                    This system helps you manage students, rooms, and staff in your hostel efficiently.
-                    Use the navigation menu above to access different sections of the system.
-                </p>
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-people-fill"></i> Students</h5>
+                <p class="card-text">Manage student records and room allocations</p>
+                <a href="/students" class="btn btn-primary">Manage Students</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-door-closed"></i> Rooms</h5>
+                <p class="card-text">Manage room information and availability</p>
+                <a href="/rooms" class="btn btn-primary">Manage Rooms</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-person-badge"></i> Staff</h5>
+                <p class="card-text">Manage hostel staff and their shifts</p>
+                <a href="/staff" class="btn btn-primary">Manage Staff</a>
             </div>
         </div>
     </div>
 </div>
 
 <div class="row mt-4">
-    <div class="col-md-4">
-        <div class="card text-white bg-primary mb-3">
+    <div class="col-md-12">
+        <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Students</h5>
-                <p class="card-text">Manage student check-ins, check-outs, and room allocations.</p>
-                <a href="/students" class="btn btn-light">Go to Students</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card text-white bg-success mb-3">
-            <div class="card-body">
-                <h5 class="card-title">Rooms</h5>
-                <p class="card-text">Manage hostel rooms, capacities, and availability.</p>
-                <a href="/rooms" class="btn btn-light">Go to Rooms</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card text-white bg-info mb-3">
-            <div class="card-body">
-                <h5 class="card-title">Staff</h5>
-                <p class="card-text">Manage hostel staff and their shifts.</p>
-                <a href="/staff" class="btn btn-light">Go to Staff</a>
+                <h5 class="card-title">Quick Stats</h5>
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <h3>{{ current_residents }}</h3>
+                        <p>Current Residents</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h3>{{ available_rooms }}</h3>
+                        <p>Available Rooms</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h3>{{ occupancy_rate }}%</h3>
+                        <p>Occupancy Rate</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
