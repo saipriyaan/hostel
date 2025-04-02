@@ -7,14 +7,13 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
 # Database configuration for XAMPP
-# Remote MySQL Database Configuration
 db_config = {
-    'host': 'sql12.freesqldatabase.com',
-    'user': 'sql12770929',
-    'password': 'lUIEvklJ9n',
-    'database': 'sql12770929',
-    'port': 3306  # Default MySQL port
+    'host': 'localhost',
+    'user': 'root',
+    'password': '',  # Empty password for XAMPP default
+    'database': 'hostel_management'
 }
+
 def create_connection():
     """Create and return a database connection"""
     try:
@@ -76,7 +75,40 @@ def init_db():
 # Home page
 @app.route('/')
 def index():
-    return render_template('index.html')
+    conn = create_connection()
+    if conn:
+        cursor = conn.cursor(dictionary=True)
+        try:
+            # Get current residents count
+            cursor.execute("SELECT COUNT(*) as count FROM students WHERE check_out_date IS NULL")
+            current_residents = cursor.fetchone()['count']
+            
+            # Get available rooms count
+            cursor.execute("SELECT COUNT(*) as count FROM rooms WHERE status='available'")
+            available_rooms = cursor.fetchone()['count']
+            
+            # Calculate occupancy rate
+            cursor.execute("SELECT SUM(capacity) as total_capacity, SUM(current_occupancy) as total_occupancy FROM rooms")
+            stats = cursor.fetchone()
+            occupancy_rate = round((stats['total_occupancy'] / stats['total_capacity']) * 100 if stats['total_capacity'] else 0
+            
+            return render_template('index.html', 
+                                current_residents=current_residents,
+                                available_rooms=available_rooms,
+                                occupancy_rate=occupancy_rate)
+        except Error as e:
+            flash(f"Database error: {str(e)}", 'danger')
+            return render_template('index.html', 
+                                current_residents=0,
+                                available_rooms=0,
+                                occupancy_rate=0)
+        finally:
+            cursor.close()
+            conn.close()
+    return render_template('index.html', 
+                         current_residents=0,
+                         available_rooms=0,
+                         occupancy_rate=0)
 
 # Student management
 @app.route('/students')
@@ -85,13 +117,25 @@ def students():
     if conn:
         cursor = conn.cursor(dictionary=True)
         try:
-            cursor.execute("SELECT * FROM students")
+            # Get all students
+            cursor.execute("""
+                SELECT s.*, r.room_number 
+                FROM students s 
+                LEFT JOIN rooms r ON s.room_id = r.id
+            """)
             students = cursor.fetchall()
             
-            cursor.execute("SELECT id, room_number FROM rooms WHERE status='available'")
+            # Get available rooms
+            cursor.execute("""
+                SELECT id, room_number 
+                FROM rooms 
+                WHERE status='available' OR status='partially_occupied'
+            """)
             available_rooms = cursor.fetchall()
             
-            return render_template('students.html', students=students, available_rooms=available_rooms)
+            return render_template('students.html', 
+                                students=students, 
+                                available_rooms=available_rooms)
         except Error as e:
             flash(f"Database error: {str(e)}", 'danger')
             return render_template('students.html', students=[], available_rooms=[])
@@ -113,7 +157,7 @@ def add_student():
             
         conn = create_connection()
         if conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(dictionary=True)
             try:
                 # Add student
                 cursor.execute("""
@@ -121,16 +165,27 @@ def add_student():
                     VALUES (%s, %s, %s, %s)
                 """, (name, roll_number, room_id, datetime.now().date()))
                 
-                # Update room occupancy
+                # Get room capacity
                 cursor.execute("""
-                    UPDATE rooms 
-                    SET current_occupancy = current_occupancy + 1,
-                        status = CASE 
-                            WHEN capacity = current_occupancy + 1 THEN 'occupied'
-                            ELSE 'partially_occupied'
-                        END
+                    SELECT capacity, current_occupancy 
+                    FROM rooms 
                     WHERE id = %s
                 """, (room_id,))
+                room = cursor.fetchone()
+                
+                # Update room status
+                new_occupancy = room['current_occupancy'] + 1
+                if new_occupancy == room['capacity']:
+                    status = 'occupied'
+                else:
+                    status = 'partially_occupied'
+                
+                cursor.execute("""
+                    UPDATE rooms 
+                    SET current_occupancy = %s,
+                        status = %s
+                    WHERE id = %s
+                """, (new_occupancy, status, room_id))
                 
                 conn.commit()
                 flash('Student added successfully!', 'success')
@@ -143,6 +198,72 @@ def add_student():
             finally:
                 cursor.close()
                 conn.close()
+    
+    return redirect(url_for('students'))
+
+@app.route('/check_out/<int:student_id>')
+def check_out(student_id):
+    conn = create_connection()
+    if conn:
+        cursor = conn.cursor(dictionary=True)
+        try:
+            # Get student's room
+            cursor.execute("""
+                SELECT room_id 
+                FROM students 
+                WHERE id = %s
+            """, (student_id,))
+            result = cursor.fetchone()
+            
+            if not result or not result['room_id']:
+                flash('Student or room not found!', 'danger')
+                return redirect(url_for('students'))
+                
+            room_id = result['room_id']
+            
+            # Update student record
+            cursor.execute("""
+                UPDATE students 
+                SET check_out_date = %s 
+                WHERE id = %s
+            """, (datetime.now().date(), student_id))
+            
+            # Update room status
+            cursor.execute("""
+                UPDATE rooms 
+                SET current_occupancy = current_occupancy - 1
+                WHERE id = %s
+            """, (room_id,))
+            
+            # Check if room became available
+            cursor.execute("""
+                SELECT capacity, current_occupancy 
+                FROM rooms 
+                WHERE id = %s
+            """, (room_id,))
+            room = cursor.fetchone()
+            
+            if room['current_occupancy'] == 0:
+                cursor.execute("""
+                    UPDATE rooms 
+                    SET status = 'available' 
+                    WHERE id = %s
+                """, (room_id,))
+            else:
+                cursor.execute("""
+                    UPDATE rooms 
+                    SET status = 'partially_occupied' 
+                    WHERE id = %s
+                """, (room_id,))
+            
+            conn.commit()
+            flash('Student checked out successfully!', 'success')
+        except Error as e:
+            conn.rollback()
+            flash(f'Database error: {str(e)}', 'danger')
+        finally:
+            cursor.close()
+            conn.close()
     
     return redirect(url_for('students'))
 
@@ -196,6 +317,133 @@ def add_room():
                 conn.close()
     
     return redirect(url_for('rooms'))
+
+# Staff management
+@app.route('/staff')
+def staff():
+    conn = create_connection()
+    if conn:
+        cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute("SELECT * FROM staff")
+            staff_members = cursor.fetchall()
+            return render_template('staff.html', staff_members=staff_members)
+        except Error as e:
+            flash(f"Database error: {str(e)}", 'danger')
+            return render_template('staff.html', staff_members=[])
+        finally:
+            cursor.close()
+            conn.close()
+    return render_template('staff.html', staff_members=[])
+
+@app.route('/add_staff', methods=['POST'])
+def add_staff():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        role = request.form.get('role', '').strip()
+        email = request.form.get('email', '').strip()
+        phone = request.form.get('phone', '').strip()
+        shift = request.form.get('shift', 'Morning').strip()
+        
+        if not name or not role:
+            flash('Name and role are required', 'danger')
+            return redirect(url_for('staff'))
+        
+        conn = create_connection()
+        if conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("""
+                    INSERT INTO staff (name, role, email, phone, shift)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (name, role, email, phone, shift))
+                
+                conn.commit()
+                flash('Staff member added successfully!', 'success')
+            except Error as e:
+                conn.rollback()
+                flash(f'Database error: {str(e)}', 'danger')
+            finally:
+                cursor.close()
+                conn.close()
+        
+    return redirect(url_for('staff'))
+
+# Reports
+@app.route('/reports')
+def reports():
+    conn = create_connection()
+    if conn:
+        cursor = conn.cursor(dictionary=True)
+        try:
+            # Current residents
+            cursor.execute("SELECT COUNT(*) as count FROM students WHERE check_out_date IS NULL")
+            current_residents = cursor.fetchone()['count']
+            
+            # Available rooms
+            cursor.execute("SELECT COUNT(*) as count FROM rooms WHERE status='available'")
+            available_rooms = cursor.fetchone()['count']
+            
+            # Partially occupied rooms
+            cursor.execute("SELECT COUNT(*) as count FROM rooms WHERE status='partially_occupied'")
+            partially_occupied_rooms = cursor.fetchone()['count']
+            
+            # Occupied rooms
+            cursor.execute("SELECT COUNT(*) as count FROM rooms WHERE status='occupied'")
+            occupied_rooms = cursor.fetchone()['count']
+            
+            # Occupancy rate
+            cursor.execute("SELECT SUM(capacity) as total_capacity, SUM(current_occupancy) as total_occupancy FROM rooms")
+            stats = cursor.fetchone()
+            total_capacity = stats['total_capacity'] or 0
+            total_occupancy = stats['total_occupancy'] or 0
+            occupancy_rate = round((total_occupancy / total_capacity * 100) if total_capacity else 0
+            
+            # Recent check-ins
+            cursor.execute("""
+                SELECT s.name, s.roll_number, r.room_number, s.check_in_date
+                FROM students s
+                JOIN rooms r ON s.room_id = r.id
+                WHERE s.check_out_date IS NULL
+                ORDER BY s.check_in_date DESC
+                LIMIT 5
+            """)
+            recent_checkins = cursor.fetchall()
+            
+            # Room distribution
+            cursor.execute("SELECT * FROM rooms ORDER BY room_number")
+            room_distribution = cursor.fetchall()
+            
+            return render_template('reports.html', 
+                                current_residents=current_residents,
+                                available_rooms=available_rooms,
+                                partially_occupied_rooms=partially_occupied_rooms,
+                                occupied_rooms=occupied_rooms,
+                                occupancy_rate=occupancy_rate,
+                                recent_checkins=recent_checkins,
+                                room_distribution=room_distribution)
+            
+        except Error as e:
+            flash(f"Database error: {str(e)}", 'danger')
+            return render_template('reports.html', 
+                                current_residents=0,
+                                available_rooms=0,
+                                partially_occupied_rooms=0,
+                                occupied_rooms=0,
+                                occupancy_rate=0,
+                                recent_checkins=[],
+                                room_distribution=[])
+        finally:
+            cursor.close()
+            conn.close()
+    return render_template('reports.html', 
+                         current_residents=0,
+                         available_rooms=0,
+                         partially_occupied_rooms=0,
+                         occupied_rooms=0,
+                         occupancy_rate=0,
+                         recent_checkins=[],
+                         room_distribution=[])
 
 if __name__ == '__main__':
     init_db()
