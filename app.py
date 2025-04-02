@@ -249,6 +249,7 @@ def reports():
     
     conn.close()
     
+    
     return render_template('reports.html', 
                          current_residents=current_residents,
                          available_rooms=available_rooms,
