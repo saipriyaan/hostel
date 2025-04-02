@@ -5,14 +5,14 @@ from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
-
-# Database configuration for XAMPP
 db_config = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '',  # Empty password for XAMPP default
-    'database': 'hostel_management'
+    'host': 'sql12.freesqldatabase.com',
+    'user': 'sql12770929',
+    'password': 'lUIEvklJ9n',
+    'database': 'sql12770929',
+    'port': 3306  # Default MySQL port
 }
+
 
 def create_connection():
     """Create and return a database connection"""
@@ -90,7 +90,7 @@ def index():
             # Calculate occupancy rate
             cursor.execute("SELECT SUM(capacity) as total_capacity, SUM(current_occupancy) as total_occupancy FROM rooms")
             stats = cursor.fetchone()
-            occupancy_rate = round((stats['total_occupancy'] / stats['total_capacity']) * 100 if stats['total_capacity'] else 0
+            occupancy_rate = round((stats['total_occupancy'] / stats['total_capacity']) * 100 if stats['total_capacity'] else 0)
             
             return render_template('index.html', 
                                 current_residents=current_residents,
